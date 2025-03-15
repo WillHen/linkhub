@@ -1,16 +1,18 @@
 import { supabase } from '@/lib/supabaseClient';
 
-interface Link {
-  id?: string;
+import { getListsFromSupabase, getLinksFromSupabase } from '@/app/utils';
+
+type EditableLink = {
+  new_id?: string;
   title: string;
-  description: string;
+  id?: string;
+  description: string | null;
   url: string;
-}
+};
+
 
 export async function fetchListAndLinks(list_id: string) {
-  const { data: listData, error: listError } = await supabase
-    .from('lists')
-    .select('*')
+  const { data: listData, error: listError } = await getListsFromSupabase(supabase)
     .eq('id', list_id)
     .single();
 
@@ -18,23 +20,28 @@ export async function fetchListAndLinks(list_id: string) {
     throw new Error(listError.message);
   }
 
-  const { data: linksData, error: linksError } = await supabase
-    .from('links')
-    .select('*')
+  const { data: linksData, error: linksError } = await getLinksFromSupabase(supabase)
     .eq('list_id', list_id);
 
   if (linksError) {
     throw new Error(linksError.message);
   }
 
-  return { listData, linksData };
+  const EditableLinks = linksData.map((link) => ({
+    id: link.id,
+    title: link.title,
+    description: link.description || '',
+    url: link.url
+  }));
+
+  return { listData, linksData: EditableLinks };
 }
 
 export async function saveListAndLinks(
   list_id: string,
   title: string,
   description: string,
-  links: Link[],
+  links: EditableLink[],
   user_id: string
 ) {
   const { error: listError } = await supabase

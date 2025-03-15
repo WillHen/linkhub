@@ -13,3 +13,6 @@ export function getLinksFromSupabase(supabaseClient: SupabaseClient<Database, 'p
     Database['public'] extends GenericSchema ? Database['public'] : unknown>) {
     return supabaseClient.from('links').select('*');
 }
+
+export type Link = Database['public']['Tables']['links']['Row'];
+export type List = Database['public']['Tables']['lists']['Row'];
