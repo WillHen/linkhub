@@ -1,10 +1,8 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 import { useParams } from 'next/navigation';
 
-import { fetchListAndLinks, saveListAndLinks } from './actions';
 import { ListForm, SaveAction } from '@/app/protected/list/components';
 
 import type { FormDetails } from '@/app/protected/list/components/ListForm';
@@ -22,7 +20,6 @@ export default function EditListPage() {
   const { list_id } = useParams();
   const [isLoading, setisLoading] = useState(true);
   const [, setError] = useState('');
-  const [user_id, setUser_id] = useState('');
   const [initialValues, setInitialValues] = useState({
     title: '',
     description: '',
@@ -31,54 +28,56 @@ export default function EditListPage() {
 
   const handleDeleteList = async (listId: string) => {
     try {
-      // Delete associated links
-      const { error: linksError } = await supabase
-        .from('links')
-        .delete()
-        .eq('list_id', listId);
+      const response = await fetch(`/api/lists/${listId}`, {
+        method: 'DELETE'
+      });
 
-      if (linksError) {
-        throw new Error(linksError.message);
-      }
-
-      // Delete the list
-      const { error: listError } = await supabase
-        .from('lists')
-        .delete()
-        .eq('id', listId);
-
-      if (listError) {
-        throw new Error(listError.message);
+      if (!response.ok) {
+        throw new Error('Failed to delete list');
       }
 
       router.push('/protected');
     } catch (error: unknown) {
       const message = (error as Error).message;
-      console.error('Error deleting list and links:', message);
+      console.error('Error deleting list:', message);
     }
   };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const {
-          data: { user }
-        } = await supabase.auth.getUser();
-        const { listData, linksData } = await fetchListAndLinks(
-          list_id as string,
-          user?.id as string
-        );
-        setUser_id(user?.id as string);
+        // Get user from API to ensure authentication
+        const userResponse = await fetch('/api/user');
+        if (!userResponse.ok) {
+          throw new Error('Failed to fetch user');
+        }
+
+        // Fetch list data
+        const listResponse = await fetch(`/api/lists/${list_id}`);
+
+        if (!listResponse.ok) {
+          throw new Error('Failed to fetch list');
+        }
+        const { list: listData } = await listResponse.json();
+
+        // Fetch links data
+        const linksResponse = await fetch(`/api/links?list_id=${list_id}`);
+        if (!linksResponse.ok) {
+          throw new Error('Failed to fetch links');
+        }
+        const { links: linksData } = await linksResponse.json();
+
+        setisLoading(false);
+
         setInitialValues({
           title: listData.title,
           description: listData.description ?? '',
-          links: linksData.map((link) => ({
+          links: linksData.map((link: Link) => ({
             id: link.id,
             title: link.title,
             url: link.url
           }))
         });
-        setisLoading(false);
       } catch (err) {
         if (err instanceof Error) {
           setError(err.message);
@@ -92,40 +91,44 @@ export default function EditListPage() {
   }, [list_id]);
 
   const handleSubmit = async (values: FormDetails, linksToDelete: string[]) => {
-    let linkToDeletePromise = new Promise((resolve) => {
-      resolve(true);
-    });
+    try {
+      // First, delete any links that need to be removed
+      if (linksToDelete.length > 0) {
+        const deleteResponse = await fetch(
+          `/api/links?ids=${linksToDelete.join(',')}`,
+          {
+            method: 'DELETE'
+          }
+        );
+        if (!deleteResponse.ok) {
+          throw new Error('Failed to delete links');
+        }
+      }
+      // Then update the list and create/update links in a single request
+      const response = await fetch(`/api/lists/${list_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: values.title,
+          description: values.description,
+          links: values.links.map((link) => ({
+            title: link.title,
+            url: link.url,
+            ...(link.id && { id: link.id })
+          }))
+        })
+      });
 
-    if (linksToDelete.length > 0) {
-      linkToDeletePromise = new Promise((resolve, reject) => {
-        supabase
-          .from('links')
-          .delete()
-          .in('id', linksToDelete)
-          .then(({ error }) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(true);
-            }
-          });
-      });
+      if (!response.ok) {
+        throw new Error('Failed to update list');
+      }
+
+      router.push(`/list/view/${list_id}`);
+    } catch (error) {
+      setError((error as Error).message);
     }
-    saveListAndLinks(
-      list_id as string,
-      values.title,
-      values.description,
-      values.links,
-      user_id
-    )
-      .then(() => {
-        linkToDeletePromise.then(() => {
-          router.push(`/list/view/${list_id}`);
-        });
-      })
-      .catch((error) => {
-        setError((error as Error).message);
-      });
   };
 
   return (

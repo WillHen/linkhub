@@ -1,2 +1,2 @@
-export * from './SkeleonLoader';
+export * from './SkeletonLoader';
 export * from './ListForm';

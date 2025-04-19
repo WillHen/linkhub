@@ -22,7 +22,8 @@ jest.mock('@/utils/supabase/server', () => ({
           session: {
             access_token: 'test-token'
           }
-        }
+        },
+        error: null
       })
     }
   })
@@ -51,7 +52,10 @@ describe('DeleteAccountPage', () => {
   });
 
   it('should make API call and render success state on successful deletion', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200
+    });
 
     const result = await DeleteAccountPage({
       searchParams: { token: 'test-token' }
@@ -64,7 +68,8 @@ describe('DeleteAccountPage', () => {
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
           Authorization: 'Bearer test-token'
-        })
+        }),
+        body: JSON.stringify({ token: 'test-token' })
       })
     );
 
@@ -81,5 +86,19 @@ describe('DeleteAccountPage', () => {
 
     expect(result.type).toBe(DeleteAccountClient);
     expect(result.props).toEqual({ error: 'An unexpected error occurred' });
+  });
+
+  it('should render error state when API returns non-200 status', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 500
+    });
+
+    const result = await DeleteAccountPage({
+      searchParams: { token: 'test-token' }
+    });
+
+    expect(result.type).toBe(DeleteAccountClient);
+    expect(result.props).toEqual({ success: false });
   });
 });

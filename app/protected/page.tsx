@@ -24,16 +24,18 @@ export default async function ProtectedPage() {
     <div className='flex-1 w-full flex flex-col gap-12 flex-wrap sm:py-10 sm:px-20'>
       <div className='relative flex min-h-[480px] flex-col gap-6 bg-cover bg-center bg-no-repeat @[480px]:gap-8 @[480px]:rounded-xl items-center justify-center p-4'>
         <Image
-          src='https://cdn.usegalileo.ai/sdxl10/431556f2-fc02-4250-9980-f806143969ab.png'
+          src='/assets/linksdeckbackground3.png'
           alt='Background'
-          layout='fill'
-          style={{ backgroundPosition: 'center 45%', objectFit: 'cover' }}
+          fill
           priority
+          quality={75}
+          sizes='100vw'
+          style={{ objectFit: 'cover', objectPosition: 'center' }}
           className='z-[-1]' // Ensures the image is behind the content
         />
         <div className='flex flex-col gap-2 text-center'>
           <h1 className='text-white text-4xl font-black leading-tight tracking-[-0.033em] @[480px]:text-5xl @[480px]:font-black @[480px]:leading-tight @[480px]:tracking-[-0.033em]'>
-            Welcome to LinkHub
+            Welcome to LinksDeck
           </h1>
           <h2 className='text-white text-sm font-normal leading-normal @[480px]:text-base @[480px]:font-normal @[480px]:leading-normal'>
             Organize your links into lists that you can share and explore. Start

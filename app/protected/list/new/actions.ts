@@ -1,4 +1,3 @@
-// filepath: /Users/williamhenshaw/Desktop/projects/linkhub/app/protected/list/actions.ts
 import { supabase } from '@/lib/supabaseClient';
 
 interface Link {

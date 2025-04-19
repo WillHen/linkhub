@@ -1,98 +1,62 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Page from '../page';
-import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
-import { fetchListAndLinks, saveListAndLinks } from '../actions';
+import { useRouter, useParams } from 'next/navigation';
 
+// Mock modules
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
-  useParams: jest.fn().mockReturnValue({ list_id: 'list_id' })
+  useParams: jest.fn()
 }));
+
+// Mock fetch for API calls
+global.fetch = jest.fn();
 
 const mockUser = { id: 'user1', email: 'user@example.com' };
-
-jest.mock('@/lib/supabaseClient', () => ({
-  supabase: {
-    from: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    in: jest.fn().mockReturnThis()
+const mockListId = '123e4567-e89b-12d3-a456-426614174000'; // Valid UUID format
+const mockList = {
+  id: mockListId,
+  title: 'Test List',
+  description: 'Test Description',
+  user_id: 'user1'
+};
+const mockLinks = [
+  {
+    id: 'link1',
+    title: 'Link 1',
+    url: 'https://example.com'
   }
-}));
-const mockListInsert = jest.fn().mockReturnThis();
-const mockListSelect = jest.fn().mockReturnThis();
-const mockLinkDelete = jest.fn().mockReturnThis();
-const mockListEq = jest.fn().mockReturnThis();
-const mockLinkEq = jest.fn().mockReturnThis();
-const mockLinkInsert = jest.fn().mockReturnThis();
-const mockLinkSelect = jest.fn().mockReturnThis();
-const mockListDelete = jest.fn().mockReturnThis();
-
-jest.mock('@/lib/supabaseClient', () => {
-  return {
-    supabase: {
-      auth: {
-        getUser: jest.fn(() =>
-          Promise.resolve({ data: { user: mockUser }, error: null })
-        ),
-        setSession: jest.fn()
-      },
-      from: jest.fn().mockImplementation((table) => {
-        if (table === 'lists') {
-          return {
-            insert: mockListInsert,
-            select: mockListSelect,
-            eq: mockListEq,
-            delete: mockListDelete,
-            mockListInsert,
-            mockListSelect
-          };
-        }
-
-        if (table === 'links') {
-          return {
-            insert: mockLinkInsert,
-            select: mockLinkSelect,
-            eq: mockLinkEq,
-            delete: mockLinkDelete,
-            mockLinkInsert,
-            mockLinkSelect
-          };
-        }
-      })
-    }
-  };
-});
-
-jest.mock('../actions', () => ({
-  ...jest.requireActual('../actions'),
-  fetchListAndLinks: jest.fn(
-    () => new Promise((resolve) => resolve({ listData: {}, linksData: [] }))
-  ),
-  saveListAndLinks: jest.fn(() => new Promise<void>((resolve) => resolve()))
-}));
+];
 
 describe('EditListPage', () => {
   const mockRouterPush = jest.fn();
-  const mockFetchListAndLinks = fetchListAndLinks as jest.Mock;
-  const mockSaveListAndLinks = saveListAndLinks as jest.Mock;
+
+  beforeAll(() => {
+    (useParams as jest.Mock).mockReturnValue({ list_id: mockListId });
+  });
 
   beforeEach(() => {
     (useRouter as jest.Mock).mockReturnValue({ push: mockRouterPush });
-    mockFetchListAndLinks.mockResolvedValue({
-      listData: {
-        user_id: 'user1',
-        title: 'Test List',
-        description: 'Test Description'
-      },
-      linksData: [
-        {
-          id: 'link1',
-          title: 'Link 1',
-          url: 'https://example.com'
-        }
-      ]
+    (global.fetch as jest.Mock).mockImplementation((url) => {
+      if (url.includes('/api/user')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ user: mockUser })
+        });
+      }
+      if (url.includes(`/api/lists/${mockListId}`)) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ list: mockList })
+        });
+      }
+      if (url.includes('/api/links')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ links: mockLinks })
+        });
+      }
+      return Promise.reject(new Error(`Unhandled fetch mock for ${url}`));
     });
   });
 
@@ -129,20 +93,25 @@ describe('EditListPage', () => {
     fireEvent.click(screen.getByTestId('update-list-button'));
 
     await waitFor(() => {
-      expect(mockSaveListAndLinks).toHaveBeenCalledWith(
-        'list_id',
-        'Updated List',
-        'Updated Description',
-        [
-          {
-            id: 'link1',
-            title: 'Link 1',
-            url: 'https://example.com'
-          }
-        ],
-        'user1'
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/lists/${mockListId}`,
+        expect.objectContaining({
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: 'Updated List',
+            description: 'Updated Description',
+            links: mockLinks.map(({ title, url, id }) => ({
+              title,
+              url,
+              ...(id && { id })
+            }))
+          })
+        })
       );
-      expect(mockRouterPush).toHaveBeenCalledWith('/list/view/list_id');
+      expect(mockRouterPush).toHaveBeenCalledWith(`/list/view/${mockListId}`);
     });
   });
 
@@ -152,7 +121,6 @@ describe('EditListPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('edit-list-header')).toBeInTheDocument();
       expect(screen.getByTestId('list-title-input')).toBeInTheDocument();
-
       expect(screen.queryByTestId('link-title-0')).toBeInTheDocument();
       expect(screen.queryByTestId('link-url-0')).toBeInTheDocument();
     });
@@ -176,10 +144,12 @@ describe('EditListPage', () => {
     fireEvent.click(screen.getByTestId('delete-list-button'));
 
     await waitFor(() => {
-      expect(supabase.from).toHaveBeenCalledWith('links');
-      expect(mockListDelete).toHaveBeenCalled();
-      expect(mockLinkEq).toHaveBeenCalledWith('list_id', 'list_id');
-      expect(supabase.from).toHaveBeenCalledWith('lists');
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/lists/${mockListId}`,
+        expect.objectContaining({
+          method: 'DELETE'
+        })
+      );
       expect(mockRouterPush).toHaveBeenCalledWith('/protected');
     });
   });

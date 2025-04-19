@@ -5,7 +5,7 @@ import * as Yup from 'yup';
 import isEqual from 'lodash.isequal';
 
 import { LinkDetails } from './LinkDetails';
-import { SkeletonLoader } from './SkeleonLoader';
+import { SkeletonLoader } from './SkeletonLoader';
 
 interface Link {
   title: string;

@@ -12,7 +12,7 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata = {
   metadataBase: new URL(defaultUrl),
-  title: 'LinkHub',
+  title: 'LinksDeck',
   description: 'Sure your favorite links all in one place'
 };
 
@@ -40,7 +40,7 @@ export default function RootLayout({
               <nav className='w-full flex justify-center border-b border-b-foreground/10 h-16'>
                 <div className='w-full max-w-6xl flex justify-between items-center p-3 px-7 text-sm'>
                   <span className='text-[#121417] text-lg font-bold leading-[23px]'>
-                    LinkHub
+                    LinksDeck
                   </span>
                   {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />}
                 </div>
